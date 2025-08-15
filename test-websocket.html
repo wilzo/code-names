@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teste WebSocket</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .disconnected {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .log {
+        background-color: #f8f9fa;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      input {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔌 Teste de Conexão WebSocket</h1>
+
+    <div id="status" class="status disconnected">Status: Desconectado</div>
+
+    <div>
+      <button onclick="conectar()">Conectar</button>
+      <button onclick="desconectar()">Desconectar</button>
+      <button onclick="limparLog()">Limpar Log</button>
+    </div>
+
+    <div>
+      <h3>Teste de Mensagens:</h3>
+      <input
+        type="text"
+        id="roomId"
+        placeholder="ID da Sala (ex: test-123)"
+        value="test-123"
+      />
+      <input
+        type="text"
+        id="userId"
+        placeholder="ID do Usuário"
+        value="test-user"
+      />
+      <input
+        type="text"
+        id="username"
+        placeholder="Nome do Usuário"
+        value="Teste"
+      />
+      <br />
+      <button onclick="joinRoom()">Entrar na Sala</button>
+      <button onclick="leaveRoom()">Sair da Sala</button>
+    </div>
+
+    <div class="log" id="log"><strong>Log de Conexão:</strong><br /></div>
+
+    <script>
+      let ws = null;
+      const wsUrl = "ws://localhost:3001";
+
+      function log(mensagem) {
+        const logDiv = document.getElementById("log");
+        const timestamp = new Date().toLocaleTimeString();
+        logDiv.innerHTML += `<div>[${timestamp}] ${mensagem}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function updateStatus(status, className) {
+        const statusDiv = document.getElementById("status");
+        statusDiv.textContent = `Status: ${status}`;
+        statusDiv.className = `status ${className}`;
+      }
+
+      function conectar() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          log("⚠️ Já conectado!");
+          return;
+        }
+
+        log(`🔄 Tentando conectar em ${wsUrl}...`);
+        updateStatus("Conectando...", "disconnected");
+
+        try {
+          ws = new WebSocket(wsUrl);
+
+          ws.onopen = function (event) {
+            log("✅ Conectado com sucesso!");
+            updateStatus("Conectado", "connected");
+          };
+
+          ws.onmessage = function (event) {
+            try {
+              const data = JSON.parse(event.data);
+              log(`📥 Mensagem recebida: ${JSON.stringify(data, null, 2)}`);
+            } catch (err) {
+              log(`📥 Mensagem (texto): ${event.data}`);
+            }
+          };
+
+          ws.onclose = function (event) {
+            log(
+              `❌ Conexão fechada. Código: ${event.code}, Razão: ${
+                event.reason || "Não especificada"
+              }`
+            );
+            updateStatus("Desconectado", "disconnected");
+          };
+
+          ws.onerror = function (event) {
+            log(`💥 Erro na conexão: ${event}`);
+            updateStatus("Erro na conexão", "error");
+          };
+        } catch (error) {
+          log(`💥 Erro ao criar WebSocket: ${error.message}`);
+          updateStatus("Erro", "error");
+        }
+      }
+
+      function desconectar() {
+        if (ws) {
+          ws.close();
+          log("🔌 Desconectando...");
+        } else {
+          log("⚠️ Não há conexão ativa");
+        }
+      }
+
+      function joinRoom() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log("❌ WebSocket não conectado!");
+          return;
+        }
+
+        const roomId = document.getElementById("roomId").value;
+        const userId = document.getElementById("userId").value;
+        const username = document.getElementById("username").value;
+
+        const message = {
+          type: "JOIN_ROOM",
+          roomId,
+          userId,
+          username,
+        };
+
+        ws.send(JSON.stringify(message));
+        log(`📤 Enviado: JOIN_ROOM para sala ${roomId}`);
+      }
+
+      function leaveRoom() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log("❌ WebSocket não conectado!");
+          return;
+        }
+
+        const roomId = document.getElementById("roomId").value;
+        const userId = document.getElementById("userId").value;
+
+        const message = {
+          type: "LEAVE_ROOM",
+          roomId,
+          userId,
+        };
+
+        ws.send(JSON.stringify(message));
+        log(`📤 Enviado: LEAVE_ROOM da sala ${roomId}`);
+      }
+
+      function limparLog() {
+        document.getElementById("log").innerHTML =
+          "<strong>Log de Conexão:</strong><br>";
+      }
+
+      // Tentar conectar automaticamente ao carregar a página
+      window.onload = function () {
+        log("🚀 Teste WebSocket carregado");
+        log('💡 Clique em "Conectar" para testar a conexão');
+      };
+    </script>
+  </body>
+</html>
